@@ -78,11 +78,11 @@ jobs:
             --wait \
             --timeout 2m
 
-      - name: Wait for operator to be ready
-        run: |
-          kubectl wait --for=condition=available deployment/elastic-operator-elastic-operator \
-            --namespace elastic-system \
-            --timeout=300s
+      # - name: Wait for operator to be ready
+      #   run: |
+      #     kubectl wait --for=condition=available deployment/elastic-operator-elastic-operator \
+      #       --namespace elastic-system \
+      #       --timeout=300s
 
       - name: Deploy Elasticsearch stack
         run: |
