@@ -5,10 +5,10 @@ on:
     branches: [ master ]
     paths:
       - 'elasticsearch-production/**'
-  pull_request:
-    branches: [ master ]
-    paths:
-      - 'elasticsearch-production/**'
+  # pull_request:
+  #   branches: [ master ]
+  #   paths:
+  #     - 'elasticsearch-production/**'
 
 env:
   HELM_VERSION: v3.12.0
