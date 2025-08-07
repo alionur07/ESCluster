@@ -30,9 +30,10 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - name: Add Elastic Helm repo
+      - name: Add Helm repos
         run: |
           helm repo add elastic https://helm.elastic.co
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo update
 
       - name: Helm lint operator chart
