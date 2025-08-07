@@ -1,0 +1,39 @@
+{{- if .Values.filebeat.enabled }}
+apiVersion: beat.k8s.elastic.co/v1beta1
+kind: Beat
+metadata:
+  name: {{ .Values.filebeat.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elastic-operator.labels" . | nindent 4 }}
+spec:
+  type: filebeat
+  version: {{ .Values.filebeat.version }}
+  elasticsearchRef:
+    name: {{ .Values.elasticsearch.name }}
+  daemonSet:
+    podTemplate:
+      spec:
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        containers:
+        - name: filebeat
+          resources:
+            {{- toYaml .Values.filebeat.daemonSet.resources | nindent 12 }}
+  config:
+    filebeat:
+      inputs:
+      - type: {{ .Values.filebeat.input.container.type }}
+        paths: {{ .Values.filebeat.input.container.paths | toJson }}
+    setup.template.name: {{ .Values.filebeat.template.name | quote }}
+    setup.template.pattern: {{ .Values.filebeat.template.pattern | quote }}
+    setup.ilm:
+      enabled: {{ .Values.filebeat.ilm.enabled }}
+      policy_name: {{ .Values.filebeat.ilm.policy_name | quote }}
+    output.elasticsearch:
+      index: {{ .Values.filebeat.output.elasticsearch.index | quote }}
+      {{- if .Values.filebeat.output.elasticsearch.pipeline }}
+      pipeline: {{ .Values.filebeat.output.elasticsearch.pipeline | quote }}
+      {{- end }}
+{{- end }}

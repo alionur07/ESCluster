@@ -1,0 +1,94 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: elasticsearch-alerts
+  namespace: elastic-system
+  labels:
+    app: elasticsearch
+spec:
+  groups:
+  - name: elasticsearch.rules
+    rules:
+    # Cluster Health
+    - alert: ElasticsearchClusterRed
+      expr: elasticsearch_cluster_health_status{color="red"} == 1
+      for: 5m
+      labels:
+        severity: critical
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch cluster health is RED"
+        description: "Cluster {{ $labels.cluster }} health status has been RED for 5 minutes"
+
+    - alert: ElasticsearchClusterYellow
+      expr: elasticsearch_cluster_health_status{color="yellow"} == 1
+      for: 15m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch cluster health is YELLOW"
+        description: "Cluster {{ $labels.cluster }} health status has been YELLOW for 15 minutes"
+
+    # Node Health
+    - alert: ElasticsearchNodeDown
+      expr: elasticsearch_cluster_health_number_of_nodes < count(elasticsearch_node_stats_indices_docs_count)
+      for: 5m
+      labels:
+        severity: critical
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch node down"
+        description: "An Elasticsearch node has been down for 5 minutes"
+
+    # Resource Usage
+    - alert: ElasticsearchHighCPUUsage
+      expr: rate(elasticsearch_process_cpu_percent{service="elasticsearch"}[5m]) > 85
+      for: 15m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "High CPU usage on Elasticsearch node"
+        description: "Node {{ $labels.node }} has high CPU usage (> 85%) for 15 minutes"
+
+    - alert: ElasticsearchHighMemoryUsage
+      expr: (elasticsearch_jvm_memory_used_bytes{area="heap"} / elasticsearch_jvm_memory_max_bytes{area="heap"}) * 100 > 85
+      for: 15m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "High JVM heap usage"
+        description: "Node {{ $labels.node }} has high heap usage (> 85%) for 15 minutes"
+
+    - alert: ElasticsearchHighDiskUsage
+      expr: elasticsearch_filesystem_data_available_bytes / elasticsearch_filesystem_data_size_bytes * 100 < 15
+      for: 10m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "Low disk space"
+        description: "Node {{ $labels.node }} is running out of disk space (< 15% free)"
+
+    # Performance
+    - alert: ElasticsearchHighGCCount
+      expr: rate(elasticsearch_jvm_gc_collection_seconds_count[5m]) > 5
+      for: 15m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "High garbage collection rate"
+        description: "Node {{ $labels.node }} has high GC activity"
+
+    - alert: ElasticsearchHighQueryLatency
+      expr: rate(elasticsearch_indices_search_query_time_seconds[5m]) > 1
+      for: 15m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "High query latency"
+        description: "Node {{ $labels.node }} has high query latency"

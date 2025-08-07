@@ -1,0 +1,55 @@
+{{- if .Values.filebeat.enabled }}
+apiVersion: beat.k8s.elastic.co/v1beta1
+kind: Beat
+metadata:
+  name: {{ .Values.filebeat.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elastic-stack.labels" . | nindent 4 }}
+spec:
+  type: filebeat
+  version: {{ .Values.filebeat.version }}
+  elasticsearchRef:
+    name: {{ .Values.elasticsearch.name }}
+  daemonSet:
+    podTemplate:
+      spec:
+        {{- with .Values.filebeat.podTemplate.spec }}
+        serviceAccount: {{ .serviceAccount }}
+        automountServiceAccountToken: {{ .automountServiceAccountToken }}
+        securityContext:
+          {{- toYaml .securityContext | nindent 10 }}
+        tolerations:
+          {{- toYaml .tolerations | nindent 10 }}
+        {{- end }}
+        containers:
+        - name: filebeat
+          resources:
+            {{- toYaml .Values.filebeat.daemonSet.resources | nindent 12 }}
+          volumeMounts:
+            {{- with .Values.filebeat.podTemplate.spec.volumeMounts }}
+            - name: {{ .data.name }}
+              mountPath: {{ .data.mountPath }}
+            - name: {{ .containerLogs.name }}
+              mountPath: {{ .containerLogs.mountPath }}
+              readOnly: {{ .containerLogs.readOnly }}
+            - name: {{ .systemLogs.name }}
+              mountPath: {{ .systemLogs.mountPath }}
+              readOnly: {{ .systemLogs.readOnly }}
+            {{- end }}
+        volumes:
+          {{- with .Values.filebeat.podTemplate.spec.volumes }}
+          - name: data
+            hostPath:
+              path: {{ .data.hostPath.path }}
+              type: {{ .data.hostPath.type }}
+          - name: varlibdockercontainers
+            hostPath:
+              path: {{ .containerLogs.hostPath.path }}
+          - name: varlog
+            hostPath:
+              path: {{ .systemLogs.hostPath.path }}
+          {{- end }}
+  config:
+    {{- toYaml .Values.filebeat.config | nindent 4 }}
+{{- end }}

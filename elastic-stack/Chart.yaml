@@ -1,0 +1,11 @@
+apiVersion: v2
+name: elastic-stack
+description: A Helm chart for deploying Elasticsearch stack on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "8.11.1"
+dependencies:
+  - name: eck-operator
+    version: "2.11.1"
+    repository: "https://helm.elastic.co"
+    condition: eck-operator.enabled

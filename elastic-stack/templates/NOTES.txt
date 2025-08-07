@@ -1,0 +1,13 @@
+1. The Elastic Stack has been deployed successfully!
+
+2. Get the Elasticsearch password by running:
+   kubectl get secret {{ .Values.elasticsearch.name }}-es-elastic-user -n {{ .Release.Namespace }} -o go-template='{{`{{.data.elastic | base64decode}}`}}'
+
+3. Get the Elasticsearch URL:
+   kubectl get service {{ .Values.elasticsearch.name }}-es-http -n {{ .Release.Namespace }}
+
+4. Get the Kibana URL:
+   kubectl get service {{ .Values.kibana.name }}-kb-http -n {{ .Release.Namespace }}
+
+For more information about ECK, please visit:
+https://www.elastic.co/guide/en/cloud-on-k8s/current/index.html

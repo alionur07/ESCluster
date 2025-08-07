@@ -1,0 +1,228 @@
+# Default values for elastic-stack
+# This is a YAML-formatted file.
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+  alertmanager:
+    enabled: true
+
+# ECK Operator configuration
+eck-operator:
+  enabled: false  # We'll install the operator separately
+
+# Elasticsearch configuration
+elasticsearch:
+  enabled: true
+  name: elasticsearch-cluster
+  version: "8.11.1"
+  volumeClaimDeletePolicy: "DeleteOnScaledownAndClusterDeletion"
+  
+  # Common settings
+  common:
+    service:
+      type: ClusterIP
+    storage:
+      accessMode: ReadWriteOnce
+      storageClassName: gp2
+    initContainers:
+      sysctl:
+        enabled: true
+        image: null  # Will use the same image as elasticsearch
+        command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+        securityContext:
+          privileged: true
+  nodeSets:
+    masters:
+      count: 3
+      roles: ["master"]
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "0.5"
+        limits:
+          memory: "4Gi"
+          cpu: "1"
+      podTemplate:
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      elasticsearch.k8s.elastic.co/cluster-name: elasticsearch-cluster
+                      elasticsearch.k8s.elastic.co/node-master: "true"
+                  topologyKey: topology.kubernetes.io/zone
+      storage:
+        size: 50Gi
+        storageClassName: gp2
+    
+    data:
+      count: 3
+      roles: ["data"]
+      resources:
+        requests:
+          memory: "8Gi"
+          cpu: "1.5"
+        limits:
+          memory: "8Gi"
+          cpu: "2"
+      podTemplate:
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      elasticsearch.k8s.elastic.co/cluster-name: elasticsearch-cluster
+                      elasticsearch.k8s.elastic.co/node-data: "true"
+                  topologyKey: topology.kubernetes.io/zone
+      storage:
+        size: 100Gi
+        storageClassName: gp2
+
+    ingest:
+      count: 3
+      roles: ["ingest"]
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "0.5"
+        limits:
+          memory: "4Gi"
+          cpu: "1"
+      podTemplate:
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      elasticsearch.k8s.elastic.co/cluster-name: elasticsearch-cluster
+                      elasticsearch.k8s.elastic.co/node-ingest: "true"
+                  topologyKey: topology.kubernetes.io/zone
+      storage:
+        size: 50Gi
+        storageClassName: gp2
+
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: false
+    service:
+      spec:
+        type: ClusterIP
+
+# Kibana configuration
+kibana:
+  enabled: true
+  name: kibana
+  version: "8.11.1"
+  count: 2
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "0.5"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+  service:
+    type: ClusterIP
+
+# Filebeat configuration
+filebeat:
+  enabled: true
+  name: filebeat
+  version: "8.11.1"
+  daemonSet:
+    resources:
+      requests:
+        memory: "200Mi"
+        cpu: "100m"
+      limits:
+        memory: "500Mi"
+        cpu: "500m"
+  podTemplate:
+    spec:
+      serviceAccount: filebeat
+      automountServiceAccountToken: true
+      securityContext:
+        runAsUser: 0
+        privileged: true
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      volumes:
+        data:
+          hostPath:
+            path: /var/lib/filebeat-data
+            type: DirectoryOrCreate
+        containerLogs:
+          hostPath:
+            path: /var/lib/docker/containers
+        systemLogs:
+          hostPath:
+            path: /var/log
+      volumeMounts:
+        data:
+          name: data
+          mountPath: /usr/share/filebeat/data
+        containerLogs:
+          name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        systemLogs:
+          name: varlog
+          mountPath: /var/log
+          readOnly: true
+  config:
+    filebeat:
+      inputs:
+        - type: container
+          paths:
+            - /var/log/containers/*.log
+
+    processors:
+      - add_cloud_metadata: {}
+      - add_host_metadata: {}
+    setup:
+      template:
+        name: "filebeat"
+        pattern: "filebeat-%{+yyyy.MM.dd}"
+      ilm:
+        enabled: true
+        rollover_alias: "filebeat-%{+yyyy.MM.dd}"
+    output:
+      elasticsearch:
+        hosts: ["https://elasticsearch-cluster-es-http:9200"]
+        ssl.verification_mode: "none"
+
