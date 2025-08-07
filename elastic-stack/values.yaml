@@ -2,14 +2,71 @@
 # This is a YAML-formatted file.
 
 # Monitoring configuration
+
 monitoring:
   enabled: true
+  namespace: elastic-system
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
   prometheus:
     enabled: true
+    additionalServiceMonitors:
+      - name: elasticsearch-monitoring
+        selector:
+          matchLabels:
+            elasticsearch.k8s.elastic.co/cluster-name: elasticsearch
+        namespaceSelector:
+          matchNames:
+            - elastic-system
+        endpoints:
+          - port: http
+            path: /_prometheus/metrics
+            interval: 30s
+            scrapeTimeout: 10s
   grafana:
     enabled: true
+    adminPassword: admin
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: elasticsearch
+            folder: Elasticsearch
+            type: file
+            disableDeletion: true
+            editable: false
+            options:
+              path: /var/lib/grafana/dashboards/elasticsearch
   alertmanager:
     enabled: true
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: 'null'
+        routes:
+          - match:
+              severity: critical
+            receiver: 'null'
+      receivers:
+        - name: 'null'
+      #   receiver: 'slack'
+      #   routes:
+      #     - match:
+      #         severity: critical
+      #       receiver: 'slack'
+      # receivers:
+      #   - name: 'slack'
+      #     slack_configs:
+      #       - api_url: 'https://hooks.slack.com/services/your-webhook-url'
+      #         channel: '#elasticsearch-alerts'
+      #         send_resolved: true
 
 # ECK Operator configuration
 eck-operator:
