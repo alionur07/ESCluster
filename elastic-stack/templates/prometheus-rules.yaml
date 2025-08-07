@@ -1,3 +1,4 @@
+{{- define "elasticsearch.prometheusRules" -}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -18,7 +19,7 @@ spec:
         service: elasticsearch
       annotations:
         summary: "Elasticsearch cluster health is RED"
-        description: "Cluster '{{ '{{' }} $labels.cluster {{ '}}' }}' health status has been RED for 5 minutes"
+        description: 'Cluster {{ "{{" }} $labels.cluster {{ "}}" }} health status has been RED for 5 minutes'
 
     - alert: ElasticsearchClusterYellow
       expr: elasticsearch_cluster_health_status{color="yellow"} == 1
@@ -28,7 +29,7 @@ spec:
         service: elasticsearch
       annotations:
         summary: "Elasticsearch cluster health is YELLOW"
-        description: "Cluster '{{ '{{' }} $labels.cluster {{ '}}' }}' health status has been YELLOW for 15 minutes"
+        description: 'Cluster {{ "{{" }} $labels.cluster {{ "}}" }} health status has been YELLOW for 15 minutes'
 
     # Node Health
     - alert: ElasticsearchNodeDown
@@ -50,7 +51,7 @@ spec:
         service: elasticsearch
       annotations:
         summary: "High CPU usage on Elasticsearch node"
-        description: "Node '{{ '{{' }} $labels.node {{ '}}' }}' has high CPU usage (> 85%) for 15 minutes"
+        description: 'Node {{ "{{" }} $labels.node {{ "}}" }} has high CPU usage (> 85%) for 15 minutes'
 
     - alert: ElasticsearchHighMemoryUsage
       expr: (elasticsearch_jvm_memory_used_bytes{area="heap"} / elasticsearch_jvm_memory_max_bytes{area="heap"}) * 100 > 85
@@ -60,7 +61,7 @@ spec:
         service: elasticsearch
       annotations:
         summary: "High JVM heap usage"
-        description: "Node '{{ '{{' }} $labels.node {{ '}}' }}' has high heap usage (> 85%) for 15 minutes"
+        description: 'Node {{ "{{" }} $labels.node {{ "}}" }} has high heap usage (> 85%) for 15 minutes'
 
     - alert: ElasticsearchHighDiskUsage
       expr: elasticsearch_filesystem_data_available_bytes / elasticsearch_filesystem_data_size_bytes * 100 < 15
@@ -70,7 +71,7 @@ spec:
         service: elasticsearch
       annotations:
         summary: "Low disk space"
-        description: "Node '{{ '{{' }} $labels.node {{ '}}' }}' is running out of disk space (< 15% free)"
+        description: 'Node {{ "{{" }} $labels.node {{ "}}" }} is running out of disk space (< 15% free)'
 
     # Performance
     - alert: ElasticsearchHighGCCount
@@ -81,7 +82,7 @@ spec:
         service: elasticsearch
       annotations:
         summary: "High garbage collection rate"
-        description: "Node '{{ '{{' }} $labels.node {{ '}}' }}' has high GC activity"
+        description: 'Node {{ "{{" }} $labels.node {{ "}}" }} has high GC activity'
 
     - alert: ElasticsearchHighQueryLatency
       expr: rate(elasticsearch_indices_search_query_time_seconds[5m]) > 1
@@ -91,4 +92,9 @@ spec:
         service: elasticsearch
       annotations:
         summary: "High query latency"
-        description: "Node '{{ '{{' }} $labels.node {{ '}}' }}' has high query latency"
+        description: 'Node {{ "{{" }} $labels.node {{ "}}" }} has high query latency'
+{{- end -}}
+
+{{- if .Values.monitoring.enabled -}}
+{{- include "elasticsearch.prometheusRules" . }}
+{{- end -}}
