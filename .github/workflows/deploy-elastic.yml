@@ -4,11 +4,15 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'elasticsearch-production/**'
-  # pull_request:
-  #   branches: [ master ]
-  #   paths:
-  #     - 'elasticsearch-production/**'
+      - 'elastic-operator/**'
+      - 'elastic-stack/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'elastic-operator/**'
+      - 'elastic-stack/**'
+      - '.github/workflows/**'
 
 env:
   HELM_VERSION: v3.12.0
@@ -29,23 +33,23 @@ jobs:
 
       - name: Helm lint operator chart
         run: |
-          cd elasticsearch-production/elastic-operator
+          cd elastic-operator
           helm dependency update
           helm lint .
 
       - name: Helm lint stack chart
         run: |
-          cd elasticsearch-production/elastic-stack
+          cd elastic-stack
           helm dependency update
           helm lint .
 
       - name: Package Helm charts
         run: |
           mkdir -p charts
-          cd elasticsearch-production/elastic-operator
-          helm package . -d ../../charts
+          cd elastic-operator
+          helm package . -d ../charts
           cd ../elastic-stack
-          helm package . -d ../../charts
+          helm package . -d ../charts
 
       - name: Configure kubectl
         uses: azure/k8s-set-context@v3
@@ -55,7 +59,7 @@ jobs:
         
       - name: Deploy ECK operator
         run: |
-          cd elasticsearch-production/elastic-operator
+          cd elastic-operator
           helm upgrade --install elastic-operator . \
             --namespace elastic-system \
             --create-namespace \
@@ -70,7 +74,7 @@ jobs:
 
       - name: Deploy Elasticsearch stack
         run: |
-          cd elasticsearch-production/elastic-stack
+          cd elastic-stack
           helm upgrade --install elastic-stack . \
             --namespace elastic-system \
             --wait \
