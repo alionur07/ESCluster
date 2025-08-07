@@ -2,11 +2,11 @@ name: Deploy Elasticsearch Stack
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - 'elasticsearch-production/**'
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - 'elasticsearch-production/**'
 
