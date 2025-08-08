@@ -8,40 +8,93 @@ metadata:
     {{- include "elastic-stack.labels" . | nindent 4 }}
 spec:
   version: {{ .Values.elasticsearch.version }}
-  volumeClaimDeletePolicy: {{ .Values.elasticsearch.volumeClaimDeletePolicy }}
+  
+  # Pod Disruption Budget
+  {{- if .Values.elasticsearch.podDisruptionBudget.enabled }}
+  podDisruptionBudget:
+    spec:
+      minAvailable: {{ .Values.elasticsearch.podDisruptionBudget.minAvailable }}
+  {{- end }}
+
+  # Network Policies
+  {{- if .Values.elasticsearch.networkPolicies.enabled }}
+  networkPolicies:
+    {{- toYaml .Values.elasticsearch.networkPolicies | nindent 4 }}
+  {{- end }}
+
+  # Auth configuration
+  auth:
+    {{- with .Values.elasticsearch.auth }}
+    roles:
+    {{- range .roles }}
+    - name: {{ .name }}
+      rules:
+      {{- range .rules }}
+      - resources: {{ .resources | toJson }}
+        privileges: {{ .privileges | toJson }}
+        {{- if .indices }}
+        indices: {{ .indices | toJson }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    users:
+    {{- range .users }}
+    - name: {{ .name }}
+      password: {{ .password }}
+      roles: {{ .roles | toJson }}
+    {{- end }}
+    {{- end }}
+  security:
+    {{- with .Values.elasticsearch.security }}
+    tls:
+      enabled: {{ .tls.enabled }}
+      selfSignedCertificate:
+        disabled: {{ .tls.selfSignedCertificate.disabled }}
+    {{- end }}
   nodeSets:
     # Master nodes
     - name: masters
       count: {{ .Values.elasticsearch.nodeSets.masters.count }}
       config:
         node.roles: {{ .Values.elasticsearch.nodeSets.masters.roles | toJson }}
+        {{- with .Values.elasticsearch.nodeSets.masters.config }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       podTemplate:
+        metadata:
+          annotations:
+            traffic.sidecar.istio.io/excludeOutboundPorts: "9300"
+            traffic.sidecar.istio.io/excludeInboundPorts: "9300"
         spec:
-          {{- if .Values.elasticsearch.nodeSets.masters.podTemplate.spec.affinity }}
-          affinity:
-            {{- toYaml .Values.elasticsearch.nodeSets.masters.podTemplate.spec.affinity | nindent 12 }}
-          {{- end }}
-          {{- if .Values.elasticsearch.common.initContainers.sysctl.enabled }}
           initContainers:
-          - name: sysctl
-            image: {{ default (printf "docker.elastic.co/elasticsearch/elasticsearch:%s" .Values.elasticsearch.version) .Values.elasticsearch.common.initContainers.sysctl.image }}
-            command: {{ .Values.elasticsearch.common.initContainers.sysctl.command | toJson }}
-            securityContext: {{ .Values.elasticsearch.common.initContainers.sysctl.securityContext | toJson }}
-          {{- end }}
+            - name: sysctl
+              securityContext:
+                privileged: true
+              command: ["sh", "-c", "sysctl -w vm.max_map_count=262144"]
           containers:
           - name: elasticsearch
-            resources:
-              {{- toYaml .Values.elasticsearch.nodeSets.masters.resources | nindent 14 }}
+            {{- with .Values.elasticsearch.nodeSets.masters.podTemplate.spec.containers }}
+            {{- range . }}
+            {{- if eq .name "elasticsearch" }}
+            env: {{ toYaml .env | nindent 14 }}
+            resources: {{ toYaml .resources | nindent 14 }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+          {{- if .Values.elasticsearch.nodeSets.masters.nodeSelector }}
+          nodeSelector:
+            {{- toYaml .Values.elasticsearch.nodeSets.masters.nodeSelector | nindent 12 }}
+          {{- end }}
       volumeClaimTemplates:
       - metadata:
           name: elasticsearch-data
         spec:
           accessModes:
-          - {{ .Values.elasticsearch.common.storage.accessMode }}
+          - ReadWriteOnce
           resources:
             requests:
               storage: {{ .Values.elasticsearch.nodeSets.masters.storage.size }}
-          storageClassName: {{ .Values.elasticsearch.common.storage.storageClassName }}
+          storageClassName: {{ .Values.elasticsearch.nodeSets.masters.storage.storageClassName }}
 
     # Data nodes
     - name: data
@@ -50,10 +103,6 @@ spec:
         node.roles: {{ .Values.elasticsearch.nodeSets.data.roles | toJson }}
       podTemplate:
         spec:
-          {{- if .Values.elasticsearch.nodeSets.data.podTemplate.spec.affinity }}
-          affinity:
-            {{- toYaml .Values.elasticsearch.nodeSets.data.podTemplate.spec.affinity | nindent 12 }}
-          {{- end }}
           containers:
           - name: elasticsearch
             resources:
@@ -63,11 +112,11 @@ spec:
           name: elasticsearch-data
         spec:
           accessModes:
-          - {{ .Values.elasticsearch.common.storage.accessMode }}
+          - ReadWriteOnce
           resources:
             requests:
               storage: {{ .Values.elasticsearch.nodeSets.data.storage.size }}
-          storageClassName: {{ .Values.elasticsearch.common.storage.storageClassName }}
+          storageClassName: {{ .Values.elasticsearch.nodeSets.data.storage.storageClassName }}
 
     # Ingest nodes
     - name: ingest
@@ -76,10 +125,6 @@ spec:
         node.roles: {{ .Values.elasticsearch.nodeSets.ingest.roles | toJson }}
       podTemplate:
         spec:
-          {{- if .Values.elasticsearch.nodeSets.ingest.podTemplate.spec.affinity }}
-          affinity:
-            {{- toYaml .Values.elasticsearch.nodeSets.ingest.podTemplate.spec.affinity | nindent 12 }}
-          {{- end }}
           containers:
           - name: elasticsearch
             resources:
@@ -89,13 +134,12 @@ spec:
           name: elasticsearch-data
         spec:
           accessModes:
-          - {{ .Values.elasticsearch.common.storage.accessMode }}
+          - ReadWriteOnce
           resources:
             requests:
               storage: {{ .Values.elasticsearch.nodeSets.ingest.storage.size }}
-          storageClassName: {{ .Values.elasticsearch.common.storage.storageClassName }}
+          storageClassName: {{ .Values.elasticsearch.nodeSets.ingest.storage.storageClassName }}
 
-    {{- if .Values.elasticsearch.nodeSets.coordinating }}
     # Coordinating nodes
     - name: coordinating
       count: {{ .Values.elasticsearch.nodeSets.coordinating.count }}
@@ -107,18 +151,17 @@ spec:
           - name: elasticsearch
             resources:
               {{- toYaml .Values.elasticsearch.nodeSets.coordinating.resources | nindent 14 }}
-    {{- end }}
 
   http:
     tls:
       selfSignedCertificate:
-        disabled: false
+        disabled: {{ not .Values.elasticsearch.tls.enabled }}
     service:
       spec:
-        type: {{ .Values.elasticsearch.http.service.spec.type }}
+        type: {{ .Values.elasticsearch.service.type }}
 
   transport:
     service:
       spec:
-        type: {{ .Values.elasticsearch.http.service.spec.type }}
+        type: {{ .Values.elasticsearch.service.type }}
 {{- end }}

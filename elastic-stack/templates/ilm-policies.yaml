@@ -1,0 +1,40 @@
+{{- if .Values.elasticsearch.ilm.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.elasticsearch.name }}-ilm-policies
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elastic-stack.labels" . | nindent 4 }}
+data:
+{{- range .Values.elasticsearch.ilm.policies }}
+  {{ .name }}.json: |
+    {
+      "policy": {
+        "phases": {
+          "hot": {
+            "min_age": "{{ .body.hot.min_age }}",
+            "actions": {
+              "rollover": {
+                "max_size": "{{ .body.hot.actions.rollover.max_size }}",
+                "max_age": "{{ .body.hot.actions.rollover.max_age }}"
+              }
+            }
+          },
+          "warm": {
+            "min_age": "{{ .body.warm.min_age }}",
+            "actions": {{ .body.warm.actions | toJson }}
+          },
+          "cold": {
+            "min_age": "{{ .body.cold.min_age }}",
+            "actions": {{ .body.cold.actions | toJson }}
+          },
+          "delete": {
+            "min_age": "{{ .body.delete.min_age }}",
+            "actions": {{ .body.delete.actions | toJson }}
+          }
+        }
+      }
+    }
+{{- end }}
+{{- end }}

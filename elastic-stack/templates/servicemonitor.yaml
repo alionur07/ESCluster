@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: elasticsearch-cluster
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  endpoints:
+  - targetPort: 9200
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: https
+    path: /_cluster/health
+    tlsConfig:
+      insecureSkipVerify: true
+    bearerTokenSecret:
+      name: elasticsearch-cluster-es-elastic-user
+      key: elastic
+  namespaceSelector:
+    matchNames:
+      - elastic-system
+  selector:
+    matchLabels:
+      elasticsearch.k8s.elastic.co/cluster-name: elasticsearch-cluster

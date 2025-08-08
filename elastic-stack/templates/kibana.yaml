@@ -9,6 +9,19 @@ metadata:
 spec:
   version: {{ .Values.kibana.version }}
   count: {{ .Values.kibana.count }}
+  auth:
+    {{- with .Values.kibana.auth }}
+    username: {{ .username }}
+    password: {{ .password }}
+    {{- end }}
+  security:
+    {{- with .Values.kibana.security }}
+    tls:
+      enabled: {{ .tls.enabled }}
+    {{- end }}
+  auth:
+    fileRealm:
+    - secretName: kibana-credentials
   elasticsearchRef:
     name: {{ .Values.elasticsearch.name }}
   podTemplate:

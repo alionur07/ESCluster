@@ -13,14 +13,48 @@ on:
       - 'elastic-operator/**'
       - 'elastic-stack/**'
       - '.github/workflows/**'
+  workflow_dispatch:  # Enable manual triggers
 
 env:
-  HELM_VERSION: v3.12.0
-  KUBECTL_VERSION: v1.27.0
+  HELM_VERSION: v3.12.3
+  KUBECTL_VERSION: v1.27.3
 
 jobs:
-  validate-and-deploy:
+  validate:
+    name: Validate Charts
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Add Helm repos
+        run: |
+          helm repo add elastic https://helm.elastic.co
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Helm lint operator chart
+        run: |
+          cd elastic-operator
+          helm dependency update
+          helm lint .
+
+      - name: Helm lint stack chart
+        run: |
+          cd elastic-stack
+          helm dependency update
+          helm lint .
+
+  deploy:
+    name: Deploy Stack
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production  # Requires environment approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -70,28 +104,29 @@ jobs:
       - name: Verify kubectl configuration
         run: kubectl cluster-info
         
+      # - name: Create namespace
+      #   run: |
+      #     kubectl create namespace elastic-system --dry-run=client -o yaml | kubectl apply -f -
       - name: Deploy ECK operator
         run: |
           cd elastic-operator
           helm upgrade --install elastic-operator . \
             --namespace elastic-system \
-            --create-namespace \
+            --create-namespace
             --wait \
-            --timeout 2m
+            --timeout 1m
 
-      # - name: Wait for operator to be ready
-      #   run: |
-      #     kubectl wait --for=condition=available deployment/elastic-operator-elastic-operator \
-      #       --namespace elastic-system \
-      #       --timeout=300s
+      - name: Wait for operator to be ready
+        run: |
+          kubectl -n elastic-system wait --for=condition=ready pod -l control-plane=elastic-operator
 
       - name: Deploy Elasticsearch stack
         run: |
-          cd elastic-stack
+          cd ../elastic-stack
           helm upgrade --install elastic-stack . \
             --namespace elastic-system \
             --wait \
-            --timeout 3m
+            --timeout 1m
 
       - name: Health check - Elasticsearch
         run: |

@@ -53,9 +53,10 @@
 
 <table>
 <tr>
-    <th width="33%" align="center">👑<br>Master Nodes</th>
-    <th width="33%" align="center">💾<br>Data Nodes</th>
-    <th width="33%" align="center">🔄<br>Ingest Nodes</th>
+    <th width="25%" align="center">👑<br>Master Nodes</th>
+    <th width="25%" align="center">💾<br>Data Nodes</th>
+    <th width="25%" align="center">🔄<br>Ingest Nodes</th>
+    <th width="25%" align="center">🔀<br>Coordinating Nodes</th>
 </tr>
 <tr>
     <td>
@@ -75,6 +76,12 @@
         • Data preprocessing<br>
         • Document transforms<br>
         • Cross-zone deployment
+    </td>
+    <td>
+        • 2 coordinating nodes<br>
+        • Load balancing<br>
+        • Query routing<br>
+        • Client requests handling
     </td>
 </tr>
 </table>
