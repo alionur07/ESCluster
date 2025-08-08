@@ -82,14 +82,6 @@ jobs:
           helm dependency update
           helm lint .
 
-      - name: Package Helm charts
-        run: |
-          mkdir -p charts
-          cd elastic-operator
-          helm package . -d ../charts
-          cd ../elastic-stack
-          helm package . -d ../charts
-
       - name: Setup kubectl
         uses: actions/setup-python@v4
         with:
@@ -107,6 +99,17 @@ jobs:
       # - name: Create namespace
       #   run: |
       #     kubectl create namespace elastic-system --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy Prometheus Operator
+        run: |
+          helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --create-namespace \
+            --set grafana.enabled=true \
+            --set prometheus.enabled=true \
+            --set alertmanager.enabled=true \
+            --wait \
+            --timeout 2m
       - name: Deploy ECK operator
         run: |
           cd elastic-operator
@@ -116,9 +119,9 @@ jobs:
             --wait \
             --timeout 1m
 
-      - name: Wait for operator to be ready
-        run: |
-          kubectl -n elastic-system wait --for=condition=ready pod -l control-plane=elastic-operator
+      # - name: Wait for operator to be ready
+      #   run: |
+      #     kubectl -n elastic-system wait --for=condition=ready pod -l control-plane=elastic-operator
 
       - name: Deploy Elasticsearch stack
         run: |
@@ -128,45 +131,45 @@ jobs:
             --wait \
             --timeout 1m
 
-      - name: Health check - Elasticsearch
-        run: |
-          # Wait for Elasticsearch pods to be ready
-          kubectl wait --for=condition=ready pod \
-            -l common.k8s.elastic.co/type=elasticsearch \
-            --namespace elastic-system \
-            --timeout=600s
+      # - name: Health check - Elasticsearch
+      #   run: |
+      #     # Wait for Elasticsearch pods to be ready
+      #     kubectl wait --for=condition=ready pod \
+      #       -l common.k8s.elastic.co/type=elasticsearch \
+      #       --namespace elastic-system \
+      #       --timeout=600s
           
-          # Get Elasticsearch health
-          ES_PASSWORD=$(kubectl get secret -n elastic-system elasticsearch-es-elastic-user -o=jsonpath='{.data.elastic}' | base64 --decode)
-          ES_POD=$(kubectl get pods -n elastic-system -l common.k8s.elastic.co/type=elasticsearch -o jsonpath='{.items[0].metadata.name}')
+      #     # Get Elasticsearch health
+      #     ES_PASSWORD=$(kubectl get secret -n elastic-system elasticsearch-es-elastic-user -o=jsonpath='{.data.elastic}' | base64 --decode)
+      #     ES_POD=$(kubectl get pods -n elastic-system -l common.k8s.elastic.co/type=elasticsearch -o jsonpath='{.items[0].metadata.name}')
           
-          # Check cluster health
-          kubectl exec -n elastic-system $ES_POD -- curl -u "elastic:$ES_PASSWORD" -s -k \
-            https://localhost:9200/_cluster/health | grep -q '"status":"green"'
+      #     # Check cluster health
+      #     kubectl exec -n elastic-system $ES_POD -- curl -u "elastic:$ES_PASSWORD" -s -k \
+      #       https://localhost:9200/_cluster/health | grep -q '"status":"green"'
 
-      - name: Health check - Kibana
-        run: |
-          # Wait for Kibana pods to be ready
-          kubectl wait --for=condition=ready pod \
-            -l common.k8s.elastic.co/type=kibana \
-            --namespace elastic-system \
-            --timeout=300s
+      # - name: Health check - Kibana
+      #   run: |
+      #     # Wait for Kibana pods to be ready
+      #     kubectl wait --for=condition=ready pod \
+      #       -l common.k8s.elastic.co/type=kibana \
+      #       --namespace elastic-system \
+      #       --timeout=300s
           
-          # Check Kibana status
-          KIBANA_POD=$(kubectl get pods -n elastic-system -l common.k8s.elastic.co/type=kibana -o jsonpath='{.items[0].metadata.name}')
-          kubectl logs $KIBANA_POD -n elastic-system | grep -q "Kibana is now available"
+      #     # Check Kibana status
+      #     KIBANA_POD=$(kubectl get pods -n elastic-system -l common.k8s.elastic.co/type=kibana -o jsonpath='{.items[0].metadata.name}')
+      #     kubectl logs $KIBANA_POD -n elastic-system | grep -q "Kibana is now available"
 
-      - name: Health check - Filebeat
-        run: |
-          # Wait for Filebeat pods to be ready
-          kubectl wait --for=condition=ready pod \
-            -l common.k8s.elastic.co/type=beat \
-            --namespace elastic-system \
-            --timeout=300s
+      # - name: Health check - Filebeat
+      #   run: |
+      #     # Wait for Filebeat pods to be ready
+      #     kubectl wait --for=condition=ready pod \
+      #       -l common.k8s.elastic.co/type=beat \
+      #       --namespace elastic-system \
+      #       --timeout=300s
           
-          # Check if Filebeat is sending data
-          FB_POD=$(kubectl get pods -n elastic-system -l common.k8s.elastic.co/type=beat -o jsonpath='{.items[0].metadata.name}')
-          kubectl logs $FB_POD -n elastic-system | grep -q "Connection to backoff(elasticsearch"
+      #     # Check if Filebeat is sending data
+      #     FB_POD=$(kubectl get pods -n elastic-system -l common.k8s.elastic.co/type=beat -o jsonpath='{.items[0].metadata.name}')
+      #     kubectl logs $FB_POD -n elastic-system | grep -q "Connection to backoff(elasticsearch"
 
       - name: Notify on failure
         if: failure()

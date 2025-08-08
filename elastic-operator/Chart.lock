@@ -1,9 +1,0 @@
-dependencies:
-- name: eck-operator-crds
-  repository: https://helm.elastic.co
-  version: 3.1.0
-- name: eck-operator
-  repository: https://helm.elastic.co
-  version: 3.1.0
-digest: sha256:b604f7b3cc099beda3d98e4482fdf2b4b17dec38dcda16a910f3cfd3bafcb2ed
-generated: "2025-08-08T00:21:19.748485+02:00"
